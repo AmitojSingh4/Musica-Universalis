@@ -25,16 +25,16 @@ void eulerIntegration( const double initialVelocity, const double initialPositio
     // initial velocity (meters/seccond)
     // initial position (meters)
     double deltaTime = 0.001; // delta time between steps (secconds)
-    double time      = 0;     // time (secconds)
+    double time      = 0.0;     // time (secconds)
     double velocity  = initialVelocity;
     double position  = initialPosition;
-    double mass      = 1; // mass (kilograms)
-    double k         = 1; // spring constant (newton/meters)
+    double mass      = 1.0; // mass (kilograms)
+    double k         = 1.0; // spring constant (newton/meters)
+    double dampingConstant = 1.0; // damping constant
 
     while( time < 20 ) {
         file << time << "\t" << position << "\n";
-        double temporaryPosition = position;
-        velocity += -k / mass * temporaryPosition * deltaTime;
+        velocity += (-k * position - dampingConstant * velocity)* deltaTime / mass;
         position += velocity * deltaTime;
         time += deltaTime;
     }
