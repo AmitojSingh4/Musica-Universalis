@@ -1,5 +1,10 @@
+# Clean up files
 .clang-format
-*.exe # ignores all exe files
-*.dat # ignores dat files as they may be very large
-*.ipynb # ignores the graphs
-*.pdf # ignores the graphs
+
+# Build artifacts 
+*.exe
+*.dat
+
+# Graphs and plotting
+*.ipynb
+*.pdf
