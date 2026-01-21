@@ -1,5 +1,6 @@
 # Clean up files
 .clang-format
+.vscode/
 
 # Build artifacts 
 *.exe
@@ -8,3 +9,5 @@
 # Graphs and plotting
 *.ipynb
 *.pdf
+
+Template.cpp
