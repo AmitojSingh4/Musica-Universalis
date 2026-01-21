@@ -14,7 +14,7 @@ void eulerIntegration( const double initialVelocity, const double initialPositio
 
 // main
 int main() {
-    ofstream data( "shm-data.dat" );
+    ofstream data( "SimpleHarmonicMotion-data.dat" );
     eulerIntegration( 0, 1, data );
     data.close();
     return EXIT_SUCCESS;
