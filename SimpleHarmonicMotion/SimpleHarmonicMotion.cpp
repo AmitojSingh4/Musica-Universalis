@@ -12,7 +12,7 @@ void eulerIntegration( ofstream &file );
 
 // main
 int main() {
-    string   fileName = "SimpleHarmonicMotion-data.dat"; // name of file to save data to
+    string   fileName = "SimpleHarmonicMotionData.dat"; // name of file to save data to
     ofstream data( fileName );
     eulerIntegration( data );
     data.close();
