@@ -40,7 +40,7 @@ void eulerIntegration( ofstream &file ) {
     double drivingForce            = 1.0; // driving force (newtons)
     double drivingAngularFrequency = 1.0; // driving angular frequency (radians/seccond)
 
-    while( time < timeLimit ) {
+    while( time <= timeLimit ) {
         file << format("{}\t{}\n", time, position );
         velocity += ( -k * position - dampingConstant * velocity + drivingForce * cos( drivingAngularFrequency * time ) ) * deltaTime / mass;
         position += velocity * deltaTime;
