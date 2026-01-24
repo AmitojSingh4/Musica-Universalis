@@ -9,5 +9,6 @@
 # Graphs and plotting
 *.ipynb
 *.pdf
+*.gif
 
 Template.cpp
