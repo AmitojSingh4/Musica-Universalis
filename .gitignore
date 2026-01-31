@@ -1,14 +1,24 @@
-# Clean up files
+# clean up files
 .clang-format
 .vscode/
 
-# Build artifacts 
+# build artifacts 
 *.exe
 *.dat
+build/
+cmake/
+CmakeLists.txt
 
-# Graphs and plotting
+# graphs and plotting
 *.ipynb
 *.pdf
 *.gif
 
+# miscellaneous
 Template.cpp
+report/
+
+# libraries
+include/
+lib/
+glad.c
