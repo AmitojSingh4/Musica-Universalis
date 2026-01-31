@@ -5,22 +5,20 @@
 #include <format>
 #include <fstream>
 
-using namespace std;
-
 // function prototypes
-void eulerIntegration( ofstream &file );
+void eulerIntegration( std::ofstream &file );
 
 // main
 int main() {
-    string   fileName = "SimpleHarmonicMotionData.dat"; // name of file to save data to
-    ofstream data( fileName );
+    std::string   fileName = "SimpleHarmonicMotionData.dat"; // name of file to save data to
+    std::ofstream data( fileName );
     eulerIntegration( data );
     data.close();
     return EXIT_SUCCESS;
 }
 
 // functions
-void eulerIntegration( ofstream &file ) {
+void eulerIntegration( std::ofstream &file ) {
     // initial conditions
     const double initialVelocity = 0.0; // initial velocity (meters/seccond)
     const double initialPosition = 1.0; // initial position (meters)
@@ -41,7 +39,7 @@ void eulerIntegration( ofstream &file ) {
     double drivingAngularFrequency = 1.0; // driving angular frequency (radians/seccond)
 
     while( time <= timeLimit ) {
-        file << format("{}\t{}\n", time, position );
+        file << std::format("{}\t{}\n", time, position );
         velocity += ( -k * position - dampingConstant * velocity + drivingForce * cos( drivingAngularFrequency * time ) ) * deltaTime / mass;
         position += velocity * deltaTime;
         time += deltaTime;
