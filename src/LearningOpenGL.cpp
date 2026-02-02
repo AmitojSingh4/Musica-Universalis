@@ -2,6 +2,7 @@
 #include <GLFW/glfw3.h>
 
 #include <iostream>
+#include <numbers>
 
 // function prototypes
 void framebuffer_size_callback( GLFWwindow *window, int width, int height );
@@ -17,7 +18,7 @@ const char *vertexShaderSource = "#version 330 core\n"
 const char *fragmentShaderSource = "#version 330 core\n"
     "out vec4 FragColor;\n"
     "void main() {\n"
-    "   FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);\n"
+    "   FragColor = vec4(0.0f, 0.0f, 0.0f, 1.0f);\n"
     "}\0";
 
 // main
@@ -53,19 +54,21 @@ int main() {
     // lets opengl know the size of the window it can write to
     glViewport( 0, 0, 800, 600 );
 
-    glClearColor( 0.2f, 0.3f, 0.3f, 1.0f );
+    // when screen is cleared uses this colour
+    glClearColor( 1.0f, 1.0f, 1.0f, 1.0f );
 
-    float vertices[] = { 
-        -0.5f, -0.5f, 0.0f, 
-        0.5f, -0.5f, 0.0f, 
-        0.0f, 0.5f, 0.0f 
+    struct point {
+        GLfloat x;
+        GLfloat y;
     };
 
-    // vbo
-    unsigned int VBO;
-    glGenBuffers(1, &VBO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    point graph[1000];
+
+    for( int i = 0; i < 1000; i++ ){
+        float x = (i)/100.0;
+        graph[i].x = x-1;
+        graph[i].y = cos(x*3.141592653589793);
+    }
 
     // vertex shader
     unsigned int vertexShader;
@@ -110,18 +113,17 @@ int main() {
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
 
-    // linking vertex attributes
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
+    // vbo
+    unsigned int VBO;
+    glGenBuffers(1, &VBO);
     unsigned int VAO;
     glGenVertexArrays(1, &VAO);
     glBindVertexArray(VAO);
     // copy verticies array into a buffer
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(graph), graph, GL_STATIC_DRAW);
     // set vertex attributes pointers
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
     glEnableVertexAttribArray(0);
     // use shader program
     glUseProgram(shaderProgram);
@@ -135,7 +137,7 @@ int main() {
         glClear( GL_COLOR_BUFFER_BIT );
         glUseProgram(shaderProgram);
         glBindVertexArray(VAO);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glDrawArrays(GL_LINE_STRIP, 0, 1000);
 
         glfwSwapBuffers( window );
         glfwPollEvents();
