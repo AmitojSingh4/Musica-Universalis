@@ -8,31 +8,31 @@
 #include <numbers>
 
 // function prototypes
-std::vector<double> createString( const int numberOfPoints, const double length, const double height ); // plucked string
+std::vector<float> createString( const int numberOfPoints, const float length, const float height ); // plucked string
 
-std::vector<double> createString( const int numberOfPoints, const double length, const double height, const double width, const double startingLocation, const std::string sign = "positive" ); // pulse string
+std::vector<float> createString( const int numberOfPoints, const float length, const float height, const float width, const float startingLocation, const std::string sign = "positive" ); // pulse string
 
-std::vector<double> createString( const int numberOfPoints, const int mode, const double height ); // standing wave string
+std::vector<float> createString( const int numberOfPoints, const int mode, const float height ); // standing wave string
 
-void updateString( std::vector<double> &stringVector, std::ofstream &file, const double deltaLength );
+void updateString( std::vector<float> &stringVector, std::ofstream &file, const float deltaLength );
 
 // main
 int main() {
     // file and data saving
     std::string   fileName = "WavesOnStringsData.dat"; // name of file to save data to
-    std::ofstream data( fileName );
+    std::ofstream data( "../../data/"+fileName );
     if( !data ) {
         std::cerr << format( "Error: could not open file, {}\n\n", fileName );
         abort();
     }
     // creating string vector
-    const double length         = 100; // length of the string in the x direction (meters)
+    const float length         = 100; // length of the string in the x direction (meters)
     const int    numberOfPoints = 101; // number of points in the string, can only be odd
-    const double height         = 0.1;
+    const float height         = 0.1;
     // testing
-    // vector<double> stringVector = createString( numberOfPoints, length, height ); // 1
-    // vector<double> stringVector = createString( numberOfPoints, 3, height ); // 3
-    std::vector<double> stringVector = createString( numberOfPoints, length, height, 5, 50 ); // 2
+    // vector<float> stringVector = createString( numberOfPoints, length, height ); // 1
+    // vector<float> stringVector = createString( numberOfPoints, 3, height ); // 3
+    std::vector<float> stringVector = createString( numberOfPoints, length, height, 5, 50 ); // 2
     updateString( stringVector, data, length / ( numberOfPoints - 1 ) );
 
     data.close();
@@ -41,9 +41,9 @@ int main() {
 }
 
 // functions
-std::vector<double> createString( const int numberOfPoints, const double length, const double height ) {
-    std::vector<double> stringVector( numberOfPoints, 0.0 );
-    const double   gradiant = height / ( length / 2.0 ); // gradient per point on the string
+std::vector<float> createString( const int numberOfPoints, const float length, const float height ) {
+    std::vector<float> stringVector( numberOfPoints, 0.0 );
+    const float   gradiant = height / ( length / 2.0 ); // gradient per point on the string
     for( int i = 0; i <= ( ( numberOfPoints - 1 ) / 2 ); i++ ) {
         stringVector.at( i )                      = i * gradiant; // fills left to midpoint
         stringVector.at( numberOfPoints - 1 - i ) = i * gradiant; // fills right to midpoint
@@ -51,9 +51,9 @@ std::vector<double> createString( const int numberOfPoints, const double length,
     return stringVector;
 }
 
-std::vector<double> createString( const int numberOfPoints, const double length, const double height, const double width, const double startingLocation, const std::string sign ) {
-    std::vector<double> stringVector( numberOfPoints, 0.0 );
-    double         signValue = 1.0;
+std::vector<float> createString( const int numberOfPoints, const float length, const float height, const float width, const float startingLocation, const std::string sign ) {
+    std::vector<float> stringVector( numberOfPoints, 0.0 );
+    float         signValue = 1.0;
     if( sign != "positive" ) {
         signValue = -1.0;
     }
@@ -65,27 +65,27 @@ std::vector<double> createString( const int numberOfPoints, const double length,
     return stringVector;
 }
 
-std::vector<double> createString( const int numberOfPoints, const int mode, const double height ) {
-    std::vector<double> stringVector( numberOfPoints, 0.0 );
+std::vector<float> createString( const int numberOfPoints, const int mode, const float height ) {
+    std::vector<float> stringVector( numberOfPoints, 0.0 );
     for( int i = 0; i < stringVector.size(); i++ ) {
-        double heightValue   = height * sin( i * ( mode / 2.0 ) * 2.0 * std::numbers::pi / ( numberOfPoints - 1 ) );
+        float heightValue   = height * sin( i * ( mode / 2.0 ) * 2.0 * std::numbers::pi / ( numberOfPoints - 1 ) );
         stringVector.at( i ) = heightValue;
     }
     return stringVector;
 }
 
-void updateString( std::vector<double> &stringVector, std::ofstream &file, const double deltaLength ) {
+void updateString( std::vector<float> &stringVector, std::ofstream &file, const float deltaLength ) {
     // time
-    double       deltaTime = 0.1;  // delta time between steps (secconds)
-    double       time      = 0.0;  // time (secconds)
-    const double timeLimit = 50.0; // maximum time value (secconds)
+    float       deltaTime = 0.1;  // delta time between steps (secconds)
+    float       time      = 0.0;  // time (secconds)
+    const float timeLimit = 50.0; // maximum time value (secconds)
     // string variables
     const int      stringPoints = stringVector.size();
-    const double   tension      = 10.0;       // tension along the string (newtons)
-    std::vector<double> mass( stringPoints, 1.0 ); // mass of the string (kg) - mass is uniform accross the string
+    const float   tension      = 10.0;       // tension along the string (newtons)
+    std::vector<float> mass( stringPoints, 1.0 ); // mass of the string (kg) - mass is uniform accross the string
     // temporary vectors
-    std::vector<double> velocity( stringPoints, 0.0 );
-    std::vector<double> temporaryString( stringPoints, 0.0 );
+    std::vector<float> velocity( stringPoints, 0.0 );
+    std::vector<float> temporaryString( stringPoints, 0.0 );
     temporaryString.at( 0 )                = stringVector.at( 0 );
     temporaryString.at( stringPoints - 1 ) = stringVector.at( stringPoints - 1 );
 
