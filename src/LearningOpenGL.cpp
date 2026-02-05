@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <numbers>
+#include <format>
 
 // function prototypes
 void framebuffer_size_callback( GLFWwindow *window, int width, int height );
@@ -62,13 +63,13 @@ int main() {
         GLfloat y;
     };
 
-    point graph[1000];
+    point graph[2000];
 
-    for( int i = 0; i < 1000; i++ ){
+/*     for( int i = 0; i < 1000; i++ ){
         float x = (i)/100.0;
         graph[i].x = x-1;
         graph[i].y = cos(x*3.141592653589793);
-    }
+    } */
 
     // vertex shader
     unsigned int vertexShader;
@@ -129,18 +130,30 @@ int main() {
     glUseProgram(shaderProgram);
     glBindVertexArray(VAO);
 
+    float time = 0.0;
+    glfwSwapInterval(1);
+    std::cout << std::format("hello");
 
     while( !glfwWindowShouldClose( window ) ) {
-        //
+        // _sleep(0.1);
         processInput( window );
+
+        for( int i = 0; i < 2000; i++ ){
+            float x = (i)/1000.0;
+            graph[i].x = x-1;
+            graph[i].y = cos(x*3.141592653589793 + time * 0.01);
+        }
+        glBufferData(GL_ARRAY_BUFFER, sizeof(graph), graph, GL_STATIC_DRAW);
 
         glClear( GL_COLOR_BUFFER_BIT );
         glUseProgram(shaderProgram);
         glBindVertexArray(VAO);
-        glDrawArrays(GL_LINE_STRIP, 0, 1000);
+        glDrawArrays(GL_LINE_STRIP, 0, 2000);
 
         glfwSwapBuffers( window );
         glfwPollEvents();
+
+        time += 1;
     }
 
     glfwTerminate();
