@@ -10,11 +10,30 @@
 #include <numbers>
 
 // function prototypes
+struct point {
+    GLfloat x;
+    GLfloat y;
+};
+
 std::vector<float> createString( const int numberOfPoints, const float length, const float height ); // plucked string
 
 std::vector<float> createString( const int numberOfPoints, const float length, const float height, const float width, const float startingLocation, const std::string sign = "positive" ); // pulse string
 
 std::vector<float> createString( const int numberOfPoints, const int mode, const float height ); // standing wave string
+
+void initialiseGLFW();
+
+void initialiseGLAD();
+
+void initialiseShaders( unsigned int &vertexShader, unsigned int &fragmentShader, unsigned int &shaderProgram );
+
+void initialiseVboVao(unsigned int &VBO, unsigned int &VAO, point *graph, unsigned int &shaderProgram);
+
+void input( GLFWwindow *window );
+
+void rendering( unsigned int &shaderProgram, unsigned int &VAO, const int numberOfPoints );
+
+void eventSwap( GLFWwindow *window );
 
 void framebuffer_size_callback( GLFWwindow *window, int width, int height );
 
@@ -34,15 +53,8 @@ const char *fragmentShaderSource = "#version 330 core\n"
 
 // main
 int main() {
-    // initialises glfw
-    glfwInit();
-    glfwWindowHint( GLFW_CONTEXT_VERSION_MAJOR, 3 );
-    glfwWindowHint( GLFW_CONTEXT_VERSION_MINOR, 3 );
-    glfwWindowHint( GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE );
-
-#ifdef __APPLE__
-    glfwWindowHint( GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE );
-#endif
+    // initialises GLFW
+    initialiseGLFW();
 
     // create the window and checks if its opened
     GLFWwindow *window = glfwCreateWindow( 800, 600, "WavesOnStrings", NULL, NULL );
@@ -52,102 +64,41 @@ int main() {
         return -1;
     }
     glfwMakeContextCurrent( window );
+    glfwSetFramebufferSizeCallback( window, framebuffer_size_callback ); // resizes the viewport if the size of the window is changed
 
-    // resizes the viewport if the size of the window is changed
-    glfwSetFramebufferSizeCallback( window, framebuffer_size_callback );
+    // initialises GLAD and set some parameters
+    initialiseGLAD();
 
-    // initialises glad and check if its initialised correctly
-    if( !gladLoadGLLoader( (GLADloadproc)glfwGetProcAddress ) ) {
-        std::cout << "Failed to initialize GLAD" << std::endl;
-        return -1;
+    // file and data saving
+    std::string   fileName = "WavesOnStringsData.dat"; // name of file to save data to
+    std::ofstream data( "../../data/" + fileName );
+    if( !data ) {
+        std::cerr << format( "Error: could not open file, {}\n\n", fileName );
+        abort();
     }
 
-    // lets opengl know the size of the window it can write to
-    glViewport( 0, 0, 800, 600 );
-
-    // when screen is cleared uses this colour
-    glClearColor( 1.0f, 1.0f, 1.0f, 1.0f );
-
-    struct point {
-        GLfloat x;
-        GLfloat y;
-    };
-
+    // system variables
     const float length         = 100; // length of the string in the x direction (meters)
     const int   numberOfPoints = 101; // number of points in the string, can only be odd
-    const float height         = 1.0;
+    const float height         = 1.0; // amplitude of peaks in the y direction (meters)
 
     point graph[numberOfPoints];
 
+    // initial shape of string
     // std::vector<float> stringVector = createString( numberOfPoints, length, height ); // 1
     std::vector<float> stringVector = createString( numberOfPoints, 3, height ); // 3
     // std::vector<float> stringVector = createString( numberOfPoints, length, height, 5, 50 ); // 2
 
-    for( int i = 0; i < numberOfPoints; i++ ){
-        float x = (i)/50.0;
-        graph[i].x = x-1;
-        graph[i].y = stringVector[i];
-        std::cout << graph[i].x << "\t" << graph[i].y << std::endl;
-    }
-
-    // vertex shader
+    // initialises shaders
     unsigned int vertexShader;
-    vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
-    glCompileShader(vertexShader);
-
-    int success;
-    char infolog[512];
-    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-    if(!success){
-        glGetShaderInfoLog(vertexShader, 512, NULL, infolog);
-        std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infolog << std::endl;
-    }
-
-    // fragment shader
     unsigned int fragmentShader;
-    fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
-    glCompileShader(fragmentShader);
-
-    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-    if(!success){
-        glGetShaderInfoLog(fragmentShader, 512, NULL, infolog);
-        std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infolog << std::endl;
-    }
-
-    // shader program
     unsigned int shaderProgram;
-    shaderProgram = glCreateProgram();
-    glAttachShader(shaderProgram, vertexShader);
-    glAttachShader(shaderProgram, fragmentShader);
-    glLinkProgram(shaderProgram);
+    initialiseShaders( vertexShader, fragmentShader, shaderProgram );
 
-    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
-    if(!success){
-        glGetProgramInfoLog(shaderProgram, 512, NULL, infolog);
-        std::cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n" << infolog << std::endl;
-    }
-
-    glUseProgram(shaderProgram);
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
-
-    // vbo
+    // initialises VBO and VAO
     unsigned int VBO;
-    glGenBuffers(1, &VBO);
     unsigned int VAO;
-    glGenVertexArrays(1, &VAO);
-    glBindVertexArray(VAO);
-    // copy verticies array into a buffer
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(graph), graph, GL_STATIC_DRAW);
-    // set vertex attributes pointers
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
-    glEnableVertexAttribArray(0);
-    // use shader program
-    glUseProgram(shaderProgram);
-    glBindVertexArray(VAO);
+    initialiseVboVao(VBO, VAO, graph, shaderProgram);
     
     float       deltaTime = 0.1;  // delta time between steps (secconds)
     // string variables
@@ -161,11 +112,9 @@ int main() {
     temporaryString.at( stringPoints - 1 ) = stringVector.at( stringPoints - 1 );
     const float deltaLength = length / ( numberOfPoints - 1 );
 
-    // glfwSwapInterval(1);
-
     while( !glfwWindowShouldClose( window ) ) {
         _sleep(100);
-        processInput( window );
+        input(window);
 
         for( int i = 1; i < stringPoints - 1; i++ ) {
             velocity.at( i ) += ( ( tension / mass.at( i ) ) * ( ( stringVector.at( i - 1 ) - 2 * stringVector.at( i ) + stringVector.at( i + 1 ) ) / pow( deltaLength, 2 ) ) ) * deltaTime;
@@ -182,15 +131,12 @@ int main() {
             graph[i].x = x-1;
             graph[i].y = stringVector[i];
         }
+
+        // save data to the buffer
         glBufferData(GL_ARRAY_BUFFER, sizeof(graph), graph, GL_STATIC_DRAW);
+        rendering( shaderProgram, VAO, numberOfPoints );
 
-        glClear( GL_COLOR_BUFFER_BIT );
-        glUseProgram(shaderProgram);
-        glBindVertexArray(VAO);
-        glDrawArrays(GL_LINE_LOOP, 0, 2000);
-
-        glfwSwapBuffers( window );
-        glfwPollEvents();
+        eventSwap( window );
     }
 
     glfwTerminate();
@@ -229,6 +175,105 @@ std::vector<float> createString( const int numberOfPoints, const int mode, const
         stringVector.at( i ) = heightValue;
     }
     return stringVector;
+}
+
+void initialiseGLFW(){
+    // initialises glfw
+    glfwInit();
+    glfwWindowHint( GLFW_CONTEXT_VERSION_MAJOR, 3 );
+    glfwWindowHint( GLFW_CONTEXT_VERSION_MINOR, 3 );
+    glfwWindowHint( GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE );
+
+#ifdef __APPLE__
+    glfwWindowHint( GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE );
+#endif
+}
+
+void initialiseGLAD(){
+    // initialises glad and check if its initialised correctly
+    if( !gladLoadGLLoader( (GLADloadproc)glfwGetProcAddress ) ) {
+        std::cout << "Failed to initialize GLAD" << std::endl;
+    }
+
+    // lets opengl know the size of the window it can write to
+    glViewport( 0, 0, 800, 600 );
+
+    // when screen is cleared uses this colour
+    glClearColor( 1.0f, 1.0f, 1.0f, 1.0f );
+}
+
+void initialiseShaders( unsigned int &vertexShader, unsigned int &fragmentShader, unsigned int &shaderProgram ){
+    // vertex shader
+    vertexShader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
+    glCompileShader(vertexShader);
+
+    int success;
+    char infolog[512];
+    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
+    if(!success){
+        glGetShaderInfoLog(vertexShader, 512, NULL, infolog);
+        std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infolog << std::endl;
+    }
+
+    // fragment shader
+    fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
+    glCompileShader(fragmentShader);
+
+    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
+    if(!success){
+        glGetShaderInfoLog(fragmentShader, 512, NULL, infolog);
+        std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infolog << std::endl;
+    }
+
+    // shader program
+    shaderProgram = glCreateProgram();
+    glAttachShader(shaderProgram, vertexShader);
+    glAttachShader(shaderProgram, fragmentShader);
+    glLinkProgram(shaderProgram);
+
+    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
+    if(!success){
+        glGetProgramInfoLog(shaderProgram, 512, NULL, infolog);
+        std::cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n" << infolog << std::endl;
+    }
+
+    glUseProgram(shaderProgram);
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
+}
+
+void initialiseVboVao(unsigned int &VBO, unsigned int &VAO, point *graph, unsigned int &shaderProgram){
+    // vbo
+    glGenBuffers(1, &VBO);
+    glGenVertexArrays(1, &VAO);
+    glBindVertexArray(VAO);
+    // copy verticies array into a buffer
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(graph), graph, GL_STATIC_DRAW);
+    // set vertex attributes pointers
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+    glEnableVertexAttribArray(0);
+    // use shader program
+    glUseProgram(shaderProgram);
+    glBindVertexArray(VAO);
+}
+
+void input( GLFWwindow *window ){
+    processInput( window );
+}
+
+void rendering( unsigned int &shaderProgram, unsigned int &VAO, const int numberOfPoints ){
+        glClear( GL_COLOR_BUFFER_BIT );
+        glUseProgram(shaderProgram);
+        glBindVertexArray(VAO);
+        glDrawArrays(GL_LINE_LOOP, 0, numberOfPoints);
+}
+
+void eventSwap( GLFWwindow *window ){
+    glfwSwapBuffers( window );
+    glfwPollEvents();
 }
 
 void framebuffer_size_callback( GLFWwindow *window, int width, int height ) {
