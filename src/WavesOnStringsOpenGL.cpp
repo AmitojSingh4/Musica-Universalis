@@ -8,6 +8,7 @@
 #include <fstream>
 #include <vector>
 #include <numbers>
+#include <queue>
 
 // function prototypes
 struct point
@@ -16,11 +17,21 @@ struct point
     GLfloat y;
 };
 
+struct bufferData
+{
+    std::vector<float> string;
+    float              time;
+};
+
 std::vector<float> createString( const int numberOfPoints, const float length, const float height ); // plucked string
 
 std::vector<float> createString( const int numberOfPoints, const float length, const float height, const float width, const float startingLocation, const std::string sign = "positive" ); // pulse string
 
 std::vector<float> createString( const int numberOfPoints, const int mode, const float height ); // standing wave string
+
+void pushToBuffer( std::queue<bufferData> &buffer, const std::vector<float> &stringVector, const float time );
+
+void writeToFile( std::queue<bufferData> &buffer, std::ofstream &data, const float deltaLength );
 
 void initialiseGLFW();
 
@@ -30,7 +41,7 @@ void initialiseShaders( unsigned int &vertexShader, unsigned int &fragmentShader
 
 void initialiseVboVao( unsigned int &VBO, unsigned int &VAO, point *graph, unsigned int &shaderProgram );
 
-void processInput( GLFWwindow *window, unsigned long &sleepTime );
+void processInput( GLFWwindow *window, unsigned long &sleepTime, bool &saveData );
 
 void rendering( unsigned int &shaderProgram, unsigned int &VAO, const int numberOfPoints );
 
@@ -73,12 +84,14 @@ int main() {
     initialiseGLAD();
 
     // file and data saving
+    bool          saveData = false;
     std::string   fileName = "WavesOnStringsData.dat"; // name of file to save data to
     std::ofstream data( "../../data/" + fileName );
     if( !data ) {
         std::cerr << format( "Error: could not open file, {}\n\n", fileName );
         abort();
     }
+    data << "t\tx\ty\n";
 
     // system variables
     const float length         = 100; // length of the string in the x direction (meters)
@@ -86,6 +99,8 @@ int main() {
     const float height         = 1.0; // amplitude of peaks in the y direction (meters)
 
     point graph[numberOfPoints];
+
+    std::queue<bufferData> buffer;
 
     // initial shape of string
     // std::vector<float> stringVector = createString( numberOfPoints, length, height ); // 1
@@ -104,9 +119,10 @@ int main() {
     initialiseVboVao( VBO, VAO, graph, shaderProgram );
 
     // time variables
-    float time      = 0.0; // time (secconds)
-    float deltaTime = 0.1; // delta time between steps (secconds)
+    float         time      = 0.0; // time (secconds)
+    float         deltaTime = 0.1; // delta time between steps (secconds)
     unsigned long sleepTime = 100; // time between rendered frames, does not effect the moddel only rendering (millisecconds)
+    int intTime = 0; // 
     // string variables
     const int          stringPoints = stringVector.size();
     const float        tension      = 10.0;                           // tension along the string (newtons)
@@ -120,7 +136,7 @@ int main() {
 
     while( !glfwWindowShouldClose( window ) ) {
         _sleep( sleepTime );
-        processInput( window, sleepTime );
+        processInput( window, sleepTime, saveData );
 
         // update the string for non edge points
         for( int i = 1; i < stringPoints - 1; i++ ) {
@@ -140,8 +156,18 @@ int main() {
             graph[i].y = stringVector[i];
         }
 
+        if( saveData ) {
+            writeToFile( buffer, data, deltaLength );
+            saveData = false;
+        }
+        else if( !saveData && time + 1e-4 >= intTime ) {
+            // buffer data
+            pushToBuffer( buffer, stringVector, time );
+            std::cout << time << std::endl;
+            intTime += 1;
+        }
+
         time += deltaTime;
-        std::cout << time << std::endl;
 
         // save data to the buffer
         glBufferData( GL_ARRAY_BUFFER, sizeof( graph ), graph, GL_STATIC_DRAW );
@@ -151,6 +177,7 @@ int main() {
     }
 
     glfwTerminate();
+    data.close();
     return 0;
 }
 
@@ -186,6 +213,28 @@ std::vector<float> createString( const int numberOfPoints, const int mode, const
         stringVector.at( i ) = heightValue;
     }
     return stringVector;
+}
+
+void pushToBuffer( std::queue<bufferData> &buffer, const std::vector<float> &stringVector, const float time ) {
+    bufferData data;
+    data.string = stringVector;
+    data.time   = time;
+    buffer.push( data );
+    if( buffer.size() > 20 ) {
+        buffer.pop();
+    }
+}
+
+void writeToFile( std::queue<bufferData> &buffer, std::ofstream &data, const float deltaLength ) {
+    for( int i = 0; i < buffer.size(); i++ ) {
+        std::vector<float> stringVector = buffer.front().string;
+        float              time         = buffer.front().time;
+        for( int j = 0; j < stringVector.size(); j++ ) {
+            data << std::format( "{:.1f}\t{}\t{}\n", time, j * deltaLength, stringVector.at( j ) );
+        }
+        buffer.pop();
+    }
+    std::cout << "Data Saved!" << std::endl;
 }
 
 void initialiseGLFW() {
@@ -271,7 +320,7 @@ void initialiseVboVao( unsigned int &VBO, unsigned int &VAO, point *graph, unsig
     glBindVertexArray( VAO );
 }
 
-void processInput( GLFWwindow *window, unsigned long &sleepTime ) {
+void processInput( GLFWwindow *window, unsigned long &sleepTime, bool &saveData ) {
     if( glfwGetKey( window, GLFW_KEY_ESCAPE ) == GLFW_PRESS ) {
         glfwSetWindowShouldClose( window, true );
     }
@@ -289,6 +338,9 @@ void processInput( GLFWwindow *window, unsigned long &sleepTime ) {
     }
     if( glfwGetKey( window, GLFW_KEY_5 ) == GLFW_PRESS ) {
         sleepTime = 1;
+    }
+    if( glfwGetKey( window, GLFW_KEY_0 ) == GLFW_PRESS ) {
+        saveData = true;
     }
 }
 
