@@ -10,7 +10,8 @@
 #include <numbers>
 
 // function prototypes
-struct point {
+struct point
+{
     GLfloat x;
     GLfloat y;
 };
@@ -27,9 +28,9 @@ void initialiseGLAD();
 
 void initialiseShaders( unsigned int &vertexShader, unsigned int &fragmentShader, unsigned int &shaderProgram );
 
-void initialiseVboVao(unsigned int &VBO, unsigned int &VAO, point *graph, unsigned int &shaderProgram);
+void initialiseVboVao( unsigned int &VBO, unsigned int &VAO, point *graph, unsigned int &shaderProgram );
 
-void input( GLFWwindow *window );
+void processInput( GLFWwindow *window, unsigned long &sleepTime );
 
 void rendering( unsigned int &shaderProgram, unsigned int &VAO, const int numberOfPoints );
 
@@ -37,19 +38,21 @@ void eventSwap( GLFWwindow *window );
 
 void framebuffer_size_callback( GLFWwindow *window, int width, int height );
 
-void processInput( GLFWwindow *window );
-
-const char *vertexShaderSource = "#version 330 core\n"
+// clang-format off
+const char *vertexShaderSource = 
+    "#version 330 core\n"
     "layout (location = 0) in vec3 aPos;\n"
     "void main() {\n"
     "    gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
     "}\0";
 
-const char *fragmentShaderSource = "#version 330 core\n"
+const char *fragmentShaderSource = 
+    "#version 330 core\n"
     "out vec4 FragColor;\n"
     "void main() {\n"
     "   FragColor = vec4(0.0f, 0.0f, 0.0f, 1.0f);\n"
     "}\0";
+// clang-format on
 
 // main
 int main() {
@@ -98,24 +101,28 @@ int main() {
     // initialises VBO and VAO
     unsigned int VBO;
     unsigned int VAO;
-    initialiseVboVao(VBO, VAO, graph, shaderProgram);
-    
-    float       deltaTime = 0.1;  // delta time between steps (secconds)
+    initialiseVboVao( VBO, VAO, graph, shaderProgram );
+
+    // time variables
+    float time      = 0.0; // time (secconds)
+    float deltaTime = 0.1; // delta time between steps (secconds)
+    unsigned long sleepTime = 100; // time between rendered frames, does not effect the moddel only rendering (millisecconds)
     // string variables
     const int          stringPoints = stringVector.size();
-    const float        tension      = 10.0;       // tension along the string (newtons)
-    std::vector<float> mass( stringPoints, 1.0 ); // mass of the string (kg) - mass is uniform accross the string
+    const float        tension      = 10.0;                           // tension along the string (newtons)
+    std::vector<float> mass( stringPoints, 1.0 );                     // mass of the string (kg) - mass is uniform accross the string
+    const float        deltaLength = length / ( numberOfPoints - 1 ); // the distance between points (meters)
     // temporary vectors
     std::vector<float> velocity( stringPoints, 0.0 );
     std::vector<float> temporaryString( stringPoints, 0.0 );
-    temporaryString.at( 0 )                = stringVector.at( 0 );
-    temporaryString.at( stringPoints - 1 ) = stringVector.at( stringPoints - 1 );
-    const float deltaLength = length / ( numberOfPoints - 1 );
+    temporaryString.at( 0 )                = stringVector.at( 0 );                // failsafe lines, however are unused
+    temporaryString.at( stringPoints - 1 ) = stringVector.at( stringPoints - 1 ); // also a failsafe line
 
     while( !glfwWindowShouldClose( window ) ) {
-        _sleep(100);
-        input(window);
+        _sleep( sleepTime );
+        processInput( window, sleepTime );
 
+        // update the string for non edge points
         for( int i = 1; i < stringPoints - 1; i++ ) {
             velocity.at( i ) += ( ( tension / mass.at( i ) ) * ( ( stringVector.at( i - 1 ) - 2 * stringVector.at( i ) + stringVector.at( i + 1 ) ) / pow( deltaLength, 2 ) ) ) * deltaTime;
             temporaryString.at( i ) = stringVector.at( i ) + velocity.at( i ) * deltaTime;
@@ -126,14 +133,18 @@ int main() {
         stringVector.at( stringPoints - 2 ) = temporaryString.at( stringPoints - 2 ); // last 2 points that dont get changed
         stringVector.at( stringPoints - 3 ) = temporaryString.at( stringPoints - 3 );
 
-        for( int i = 0; i < numberOfPoints; i++ ){
-            float x = (i)/50.0;
-            graph[i].x = x-1;
+        // copy the data
+        for( int i = 0; i < numberOfPoints; i++ ) {
+            float x    = ( i ) / 50.0;
+            graph[i].x = x - 1;
             graph[i].y = stringVector[i];
         }
 
+        time += deltaTime;
+        std::cout << time << std::endl;
+
         // save data to the buffer
-        glBufferData(GL_ARRAY_BUFFER, sizeof(graph), graph, GL_STATIC_DRAW);
+        glBufferData( GL_ARRAY_BUFFER, sizeof( graph ), graph, GL_STATIC_DRAW );
         rendering( shaderProgram, VAO, numberOfPoints );
 
         eventSwap( window );
@@ -177,7 +188,7 @@ std::vector<float> createString( const int numberOfPoints, const int mode, const
     return stringVector;
 }
 
-void initialiseGLFW(){
+void initialiseGLFW() {
     // initialises glfw
     glfwInit();
     glfwWindowHint( GLFW_CONTEXT_VERSION_MAJOR, 3 );
@@ -189,7 +200,7 @@ void initialiseGLFW(){
 #endif
 }
 
-void initialiseGLAD(){
+void initialiseGLAD() {
     // initialises glad and check if its initialised correctly
     if( !gladLoadGLLoader( (GLADloadproc)glfwGetProcAddress ) ) {
         std::cout << "Failed to initialize GLAD" << std::endl;
@@ -202,86 +213,97 @@ void initialiseGLAD(){
     glClearColor( 1.0f, 1.0f, 1.0f, 1.0f );
 }
 
-void initialiseShaders( unsigned int &vertexShader, unsigned int &fragmentShader, unsigned int &shaderProgram ){
+void initialiseShaders( unsigned int &vertexShader, unsigned int &fragmentShader, unsigned int &shaderProgram ) {
     // vertex shader
-    vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
-    glCompileShader(vertexShader);
+    vertexShader = glCreateShader( GL_VERTEX_SHADER );
+    glShaderSource( vertexShader, 1, &vertexShaderSource, NULL );
+    glCompileShader( vertexShader );
 
-    int success;
+    int  success;
     char infolog[512];
-    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-    if(!success){
-        glGetShaderInfoLog(vertexShader, 512, NULL, infolog);
+    glGetShaderiv( vertexShader, GL_COMPILE_STATUS, &success );
+    if( !success ) {
+        glGetShaderInfoLog( vertexShader, 512, NULL, infolog );
         std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infolog << std::endl;
     }
 
     // fragment shader
-    fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
-    glCompileShader(fragmentShader);
+    fragmentShader = glCreateShader( GL_FRAGMENT_SHADER );
+    glShaderSource( fragmentShader, 1, &fragmentShaderSource, NULL );
+    glCompileShader( fragmentShader );
 
-    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-    if(!success){
-        glGetShaderInfoLog(fragmentShader, 512, NULL, infolog);
+    glGetShaderiv( fragmentShader, GL_COMPILE_STATUS, &success );
+    if( !success ) {
+        glGetShaderInfoLog( fragmentShader, 512, NULL, infolog );
         std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infolog << std::endl;
     }
 
     // shader program
     shaderProgram = glCreateProgram();
-    glAttachShader(shaderProgram, vertexShader);
-    glAttachShader(shaderProgram, fragmentShader);
-    glLinkProgram(shaderProgram);
+    glAttachShader( shaderProgram, vertexShader );
+    glAttachShader( shaderProgram, fragmentShader );
+    glLinkProgram( shaderProgram );
 
-    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
-    if(!success){
-        glGetProgramInfoLog(shaderProgram, 512, NULL, infolog);
+    glGetProgramiv( shaderProgram, GL_LINK_STATUS, &success );
+    if( !success ) {
+        glGetProgramInfoLog( shaderProgram, 512, NULL, infolog );
         std::cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n" << infolog << std::endl;
     }
 
-    glUseProgram(shaderProgram);
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
+    glUseProgram( shaderProgram );
+    glDeleteShader( vertexShader );
+    glDeleteShader( fragmentShader );
 }
 
-void initialiseVboVao(unsigned int &VBO, unsigned int &VAO, point *graph, unsigned int &shaderProgram){
+void initialiseVboVao( unsigned int &VBO, unsigned int &VAO, point *graph, unsigned int &shaderProgram ) {
     // vbo
-    glGenBuffers(1, &VBO);
-    glGenVertexArrays(1, &VAO);
-    glBindVertexArray(VAO);
+    glGenBuffers( 1, &VBO );
+    glGenVertexArrays( 1, &VAO );
+    glBindVertexArray( VAO );
     // copy verticies array into a buffer
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(graph), graph, GL_STATIC_DRAW);
+    glBindBuffer( GL_ARRAY_BUFFER, VBO );
+    glBufferData( GL_ARRAY_BUFFER, sizeof( graph ), graph, GL_STATIC_DRAW );
     // set vertex attributes pointers
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
-    glEnableVertexAttribArray(0);
+    glVertexAttribPointer( 0, 2, GL_FLOAT, GL_FALSE, 0, (void *)0 );
+    glEnableVertexAttribArray( 0 );
     // use shader program
-    glUseProgram(shaderProgram);
-    glBindVertexArray(VAO);
+    glUseProgram( shaderProgram );
+    glBindVertexArray( VAO );
 }
 
-void input( GLFWwindow *window ){
-    processInput( window );
+void processInput( GLFWwindow *window, unsigned long &sleepTime ) {
+    if( glfwGetKey( window, GLFW_KEY_ESCAPE ) == GLFW_PRESS ) {
+        glfwSetWindowShouldClose( window, true );
+    }
+    if( glfwGetKey( window, GLFW_KEY_1 ) == GLFW_PRESS ) {
+        sleepTime = 100;
+    }
+    if( glfwGetKey( window, GLFW_KEY_2 ) == GLFW_PRESS ) {
+        sleepTime = 75;
+    }
+    if( glfwGetKey( window, GLFW_KEY_3 ) == GLFW_PRESS ) {
+        sleepTime = 50;
+    }
+    if( glfwGetKey( window, GLFW_KEY_4 ) == GLFW_PRESS ) {
+        sleepTime = 25;
+    }
+    if( glfwGetKey( window, GLFW_KEY_5 ) == GLFW_PRESS ) {
+        sleepTime = 1;
+    }
 }
 
-void rendering( unsigned int &shaderProgram, unsigned int &VAO, const int numberOfPoints ){
-        glClear( GL_COLOR_BUFFER_BIT );
-        glUseProgram(shaderProgram);
-        glBindVertexArray(VAO);
-        glDrawArrays(GL_LINE_LOOP, 0, numberOfPoints);
+void rendering( unsigned int &shaderProgram, unsigned int &VAO, const int numberOfPoints ) {
+    glClear( GL_COLOR_BUFFER_BIT );
+    glUseProgram( shaderProgram );
+    glBindVertexArray( VAO );
+    glDrawArrays( GL_LINE_LOOP, 0, numberOfPoints );
 }
 
-void eventSwap( GLFWwindow *window ){
+void eventSwap( GLFWwindow *window ) {
     glfwSwapBuffers( window );
     glfwPollEvents();
 }
 
 void framebuffer_size_callback( GLFWwindow *window, int width, int height ) {
     glViewport( 0, 0, width, height );
-}
-
-void processInput( GLFWwindow *window ) {
-    if( glfwGetKey( window, GLFW_KEY_ESCAPE ) == GLFW_PRESS ) {
-        glfwSetWindowShouldClose( window, true );
-    }
 }
