@@ -29,6 +29,8 @@ std::vector<float> createString( const int numberOfPoints, const float length, c
 
 std::vector<float> createString( const int numberOfPoints, const int mode, const float height ); // standing wave string
 
+void updateString( std::vector<float> &stringVector, std::vector<float> &velocity, const std::vector<float> &mass, const int stringPoints, const float tension, const float deltaLength, const float deltaTime );
+
 void pushToBuffer( std::queue<bufferData> &buffer, const std::vector<float> &stringVector, const float time );
 
 void writeToFile( std::queue<bufferData> &buffer, std::ofstream &data, const float deltaLength );
@@ -41,7 +43,7 @@ void initialiseShaders( unsigned int &vertexShader, unsigned int &fragmentShader
 
 void initialiseVboVao( unsigned int &VBO, unsigned int &VAO, point *graph, unsigned int &shaderProgram );
 
-void processInput( GLFWwindow *window, unsigned long &sleepTime, bool &saveData );
+void processInput( GLFWwindow *window, float &updateSpeed, bool &saveData );
 
 void rendering( unsigned int &shaderProgram, unsigned int &VAO, const int numberOfPoints );
 
@@ -119,55 +121,54 @@ int main() {
     initialiseVboVao( VBO, VAO, graph, shaderProgram );
 
     // time variables
-    float         time      = 0.0; // time (secconds)
-    float         deltaTime = 0.1; // delta time between steps (secconds)
-    unsigned long sleepTime = 100; // time between rendered frames, does not effect the moddel only rendering (millisecconds)
-    int intTime = 0; // 
+    float time        = 0.0; // time (secconds)
+    float deltaTime   = 0.1; // delta time between steps (secconds)
+    int   intTime     = 0;   // integer time used for buffering data
+    float realTime    = 0.0; // the in world real time that has passed
+    float updateSpeed = 1.0; // the speed at which the string is updated
     // string variables
     const int          stringPoints = stringVector.size();
     const float        tension      = 10.0;                           // tension along the string (newtons)
     std::vector<float> mass( stringPoints, 1.0 );                     // mass of the string (kg) - mass is uniform accross the string
     const float        deltaLength = length / ( numberOfPoints - 1 ); // the distance between points (meters)
-    // temporary vectors
+    // velocity vector
     std::vector<float> velocity( stringPoints, 0.0 );
-    std::vector<float> temporaryString( stringPoints, 0.0 );
-    temporaryString.at( 0 )                = stringVector.at( 0 );                // failsafe lines, however are unused
-    temporaryString.at( stringPoints - 1 ) = stringVector.at( stringPoints - 1 ); // also a failsafe line
+
+    glfwSwapInterval( 1 );
 
     while( !glfwWindowShouldClose( window ) ) {
-        _sleep( sleepTime );
-        processInput( window, sleepTime, saveData );
+        float        currentTime  = glfwGetTime();
+        static float previousTime = currentTime;
+        float        frameTime    = currentTime - previousTime;
+        previousTime              = currentTime;
+        // std::cout << frameTime << std::endl;
 
-        // update the string for non edge points
-        for( int i = 1; i < stringPoints - 1; i++ ) {
-            velocity.at( i ) += ( ( tension / mass.at( i ) ) * ( ( stringVector.at( i - 1 ) - 2 * stringVector.at( i ) + stringVector.at( i + 1 ) ) / pow( deltaLength, 2 ) ) ) * deltaTime;
-            temporaryString.at( i ) = stringVector.at( i ) + velocity.at( i ) * deltaTime;
-            if( i > 2 ) {
-                stringVector.at( i - 2 ) = temporaryString.at( i - 2 );
-            }
-        }
-        stringVector.at( stringPoints - 2 ) = temporaryString.at( stringPoints - 2 ); // last 2 points that dont get changed
-        stringVector.at( stringPoints - 3 ) = temporaryString.at( stringPoints - 3 );
-
-        // copy the data
-        for( int i = 0; i < numberOfPoints; i++ ) {
-            float x    = ( i ) / 50.0;
-            graph[i].x = x - 1;
-            graph[i].y = stringVector[i];
-        }
+        processInput( window, updateSpeed, saveData );
 
         if( saveData ) {
             writeToFile( buffer, data, deltaLength );
             saveData = false;
         }
-        else if( !saveData && time + 1e-4 >= intTime ) {
+        else if( !saveData && time + 1e-4 >= intTime ) { // push to buffer every int seccond
             // buffer data
             pushToBuffer( buffer, stringVector, time );
-            std::cout << time << std::endl;
+            // std::cout << time << std::endl;
             intTime += 1;
         }
 
-        time += deltaTime;
+        if( realTime + 1e-4 >= time ) {
+            updateString( stringVector, velocity, mass, stringPoints, tension, deltaLength, deltaTime );
+            // copy the data
+            for( int i = 0; i < numberOfPoints; i++ ) {
+                float x    = ( i ) / 50.0;
+                graph[i].x = x - 1;
+                graph[i].y = stringVector[i];
+            }
+            time += deltaTime;
+        }
+
+        realTime += frameTime * updateSpeed;
+        std::cout << realTime << "\t" << time << std::endl;
 
         // save data to the buffer
         glBufferData( GL_ARRAY_BUFFER, sizeof( graph ), graph, GL_STATIC_DRAW );
@@ -215,12 +216,29 @@ std::vector<float> createString( const int numberOfPoints, const int mode, const
     return stringVector;
 }
 
+void updateString( std::vector<float> &stringVector, std::vector<float> &velocity, const std::vector<float> &mass, const int stringPoints, const float tension, const float deltaLength, const float deltaTime ) {
+    // temporary vectors
+    std::vector<float> temporaryString( stringPoints, 0.0 );
+    temporaryString.at( 0 )                = stringVector.at( 0 );                // failsafe lines, however are unused
+    temporaryString.at( stringPoints - 1 ) = stringVector.at( stringPoints - 1 ); // also a failsafe line
+    // update the string for non edge points
+    for( int i = 1; i < stringPoints - 1; i++ ) {
+        velocity.at( i ) += ( ( tension / mass.at( i ) ) * ( ( stringVector.at( i - 1 ) - 2 * stringVector.at( i ) + stringVector.at( i + 1 ) ) / pow( deltaLength, 2 ) ) ) * deltaTime;
+        temporaryString.at( i ) = stringVector.at( i ) + velocity.at( i ) * deltaTime;
+        if( i > 2 ) {
+            stringVector.at( i - 2 ) = temporaryString.at( i - 2 );
+        }
+    }
+    stringVector.at( stringPoints - 2 ) = temporaryString.at( stringPoints - 2 ); // last 2 points that dont get changed
+    stringVector.at( stringPoints - 3 ) = temporaryString.at( stringPoints - 3 );
+}
+
 void pushToBuffer( std::queue<bufferData> &buffer, const std::vector<float> &stringVector, const float time ) {
     bufferData data;
     data.string = stringVector;
     data.time   = time;
     buffer.push( data );
-    if( buffer.size() > 20 ) {
+    if( buffer.size() > 10 ) {
         buffer.pop();
     }
 }
@@ -320,24 +338,24 @@ void initialiseVboVao( unsigned int &VBO, unsigned int &VAO, point *graph, unsig
     glBindVertexArray( VAO );
 }
 
-void processInput( GLFWwindow *window, unsigned long &sleepTime, bool &saveData ) {
+void processInput( GLFWwindow *window, float &updateSpeed, bool &saveData ) {
     if( glfwGetKey( window, GLFW_KEY_ESCAPE ) == GLFW_PRESS ) {
         glfwSetWindowShouldClose( window, true );
     }
     if( glfwGetKey( window, GLFW_KEY_1 ) == GLFW_PRESS ) {
-        sleepTime = 100;
+        updateSpeed = 1.0;
     }
     if( glfwGetKey( window, GLFW_KEY_2 ) == GLFW_PRESS ) {
-        sleepTime = 75;
+        updateSpeed = 2.0;
     }
     if( glfwGetKey( window, GLFW_KEY_3 ) == GLFW_PRESS ) {
-        sleepTime = 50;
+        updateSpeed = 5.0;
     }
     if( glfwGetKey( window, GLFW_KEY_4 ) == GLFW_PRESS ) {
-        sleepTime = 25;
+        updateSpeed = 0.5;
     }
     if( glfwGetKey( window, GLFW_KEY_5 ) == GLFW_PRESS ) {
-        sleepTime = 1;
+        updateSpeed = 0.1;
     }
     if( glfwGetKey( window, GLFW_KEY_0 ) == GLFW_PRESS ) {
         saveData = true;
