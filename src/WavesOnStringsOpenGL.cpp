@@ -43,13 +43,15 @@ void initialiseGLFW();
 
 void initialiseGLAD();
 
-void initialiseShaders( unsigned int &vertexShader, unsigned int &fragmentShader, unsigned int &shaderProgram );
+void initialiseShaders( unsigned int &vertexShader, unsigned int &fragmentShader, unsigned int &shaderProgram, int &colour );
 
 void initialiseVboVao( unsigned int &VBO, unsigned int &VAO, point *graph, unsigned int &shaderProgram );
 
+void initialiseAxesVboVao( unsigned int &axesVBO, unsigned int &axesVAO, point *axes, unsigned int &shaderProgram );
+
 void processInput( GLFWwindow *window, float &updateSpeed, bool &saveData );
 
-void rendering( unsigned int &shaderProgram, unsigned int &VAO, const int numberOfPoints );
+void rendering( unsigned int &shaderProgram, unsigned int &VAO, unsigned int &axesVAO, const int numberOfPoints, int colourLocation );
 
 void eventSwap( GLFWwindow *window );
 
@@ -66,8 +68,9 @@ const char *vertexShaderSource =
 const char *fragmentShaderSource = 
     "#version 330 core\n"
     "out vec4 FragColor;\n"
+    "uniform vec3 colour;\n"
     "void main() {\n"
-    "   FragColor = vec4(0.0f, 0.0f, 0.0f, 1.0f);\n"
+    "   FragColor = vec4( colour, 1.0f);\n"
     "}\0";
 // clang-format on
 
@@ -106,18 +109,35 @@ int main() {
 
     point graph[numberOfPoints];
 
+    // clang-format off
+    point axes[4] = {
+        // x axis 
+        {-1.0f, 0.0f},
+        { 1.0f, 0.0f},
+        // y axis
+        {0.0f, -1.0f},
+        {0.0f,  1.0f}
+    };
+    // clang-format on
+
     std::queue<bufferData> buffer;
 
     // initial shape of string
-    std::vector<float> stringVector = createString( numberOfPoints, length, height ); // 1
-    // std::vector<float> stringVector = createString( numberOfPoints, 3, height ); // 3
+    // std::vector<float> stringVector = createString( numberOfPoints, length, height ); // 1
+    std::vector<float> stringVector = createString( numberOfPoints, 3, height ); // 3
     // std::vector<float> stringVector = createString( numberOfPoints, length, height, 5, 50 ); // 2
 
     // initialises shaders
     unsigned int vertexShader;
     unsigned int fragmentShader;
     unsigned int shaderProgram;
-    initialiseShaders( vertexShader, fragmentShader, shaderProgram );
+    int          colourLocation;
+    initialiseShaders( vertexShader, fragmentShader, shaderProgram, colourLocation );
+
+    // initialises axis VBO and VAO
+    unsigned int axesVBO;
+    unsigned int axesVAO;
+    initialiseAxesVboVao( axesVBO, axesVAO, axes, shaderProgram );
 
     // initialises VBO and VAO
     unsigned int VBO;
@@ -179,7 +199,7 @@ int main() {
 
         // save data to the buffer
         glBufferData( GL_ARRAY_BUFFER, numberOfPoints * sizeof( point ), graph, GL_DYNAMIC_DRAW );
-        rendering( shaderProgram, VAO, numberOfPoints );
+        rendering( shaderProgram, VAO, axesVAO, numberOfPoints, colourLocation );
 
         eventSwap( window );
     }
@@ -267,7 +287,8 @@ void updateFreeDispersiveString( std::vector<float> &stringVector, std::vector<f
     std::vector<float> temporaryString( stringPoints, 0.0 );
     // first and last point
     velocity.at( 0 ) += ( ( tension / mass.at( 0 ) ) * ( ( stringVector.at( 1 ) - stringVector.at( 0 ) ) / pow( deltaLength, 2 ) ) - ( dampingCoefficient / mass.at( 0 ) ) * ( velocity.at( 0 ) ) ) * deltaTime;
-    velocity.at( stringPoints - 1 ) += ( -( tension / mass.at( stringPoints - 1 ) ) * ( ( stringVector.at( stringPoints - 1 ) - stringVector.at( stringPoints - 2 ) ) / pow( deltaLength, 2 ) ) - ( dampingCoefficient / mass.at( stringPoints - 1 ) ) * ( velocity.at( stringPoints - 1 ) ) ) * deltaTime;
+    velocity.at( stringPoints - 1 ) +=
+      ( -( tension / mass.at( stringPoints - 1 ) ) * ( ( stringVector.at( stringPoints - 1 ) - stringVector.at( stringPoints - 2 ) ) / pow( deltaLength, 2 ) ) - ( dampingCoefficient / mass.at( stringPoints - 1 ) ) * ( velocity.at( stringPoints - 1 ) ) ) * deltaTime;
     temporaryString.at( 0 )                = stringVector.at( 0 ) + velocity.at( 0 ) * deltaTime;
     temporaryString.at( stringPoints - 1 ) = stringVector.at( stringPoints - 1 ) + velocity.at( stringPoints - 1 ) * deltaTime;
     // update the string for non edge points
@@ -331,7 +352,7 @@ void initialiseGLAD() {
     glClearColor( 1.0f, 1.0f, 1.0f, 1.0f );
 }
 
-void initialiseShaders( unsigned int &vertexShader, unsigned int &fragmentShader, unsigned int &shaderProgram ) {
+void initialiseShaders( unsigned int &vertexShader, unsigned int &fragmentShader, unsigned int &shaderProgram, int &colourLocation ) {
     // vertex shader
     vertexShader = glCreateShader( GL_VERTEX_SHADER );
     glShaderSource( vertexShader, 1, &vertexShaderSource, NULL );
@@ -371,6 +392,7 @@ void initialiseShaders( unsigned int &vertexShader, unsigned int &fragmentShader
     glUseProgram( shaderProgram );
     glDeleteShader( vertexShader );
     glDeleteShader( fragmentShader );
+    colourLocation = glGetUniformLocation( shaderProgram, "colour" );
 }
 
 void initialiseVboVao( unsigned int &VBO, unsigned int &VAO, point *graph, unsigned int &shaderProgram ) {
@@ -384,9 +406,19 @@ void initialiseVboVao( unsigned int &VBO, unsigned int &VAO, point *graph, unsig
     // set vertex attributes pointers
     glVertexAttribPointer( 0, 2, GL_FLOAT, GL_FALSE, 0, (void *)0 );
     glEnableVertexAttribArray( 0 );
-    // use shader program
-    glUseProgram( shaderProgram );
-    glBindVertexArray( VAO );
+}
+
+void initialiseAxesVboVao( unsigned int &axesVBO, unsigned int &axesVAO, point *axes, unsigned int &shaderProgram ) {
+    // vbo
+    glGenBuffers( 1, &axesVBO );
+    glGenVertexArrays( 1, &axesVAO );
+    glBindVertexArray( axesVAO );
+    // copy verticies array into a buffer
+    glBindBuffer( GL_ARRAY_BUFFER, axesVBO );
+    glBufferData( GL_ARRAY_BUFFER, 4 * sizeof( point ), axes, GL_STATIC_DRAW );
+    // set vertex attributes pointers
+    glVertexAttribPointer( 0, 2, GL_FLOAT, GL_FALSE, 0, (void *)0 );
+    glEnableVertexAttribArray( 0 );
 }
 
 void processInput( GLFWwindow *window, float &updateSpeed, bool &saveData ) {
@@ -413,9 +445,17 @@ void processInput( GLFWwindow *window, float &updateSpeed, bool &saveData ) {
     }
 }
 
-void rendering( unsigned int &shaderProgram, unsigned int &VAO, const int numberOfPoints ) {
+void rendering( unsigned int &shaderProgram, unsigned int &VAO, unsigned int &axesVAO, const int numberOfPoints, int colourLocation ) {
     glClear( GL_COLOR_BUFFER_BIT );
     glUseProgram( shaderProgram );
+    // axes
+    glUniform3f(colourLocation, 0.75f, 0.75f, 0.75f );
+    glLineWidth( 1.0f );
+    glBindVertexArray( axesVAO );
+    glDrawArrays( GL_LINES, 0, 4 );
+    // string
+    glUniform3f(colourLocation, 0.0f, 0.0f, 0.0f );
+    glLineWidth( 1.3f );
     glBindVertexArray( VAO );
     glDrawArrays( GL_LINE_STRIP, 0, numberOfPoints );
 }
