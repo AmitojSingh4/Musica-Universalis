@@ -80,6 +80,9 @@ void eventSwap( GLFWwindow *window );
 
 void framebuffer_size_callback( GLFWwindow *window, int width, int height );
 
+// shader sources
+// --------------
+
 // clang-format off
 const char *vertexShaderSource = 
     "#version 330 core\n"
