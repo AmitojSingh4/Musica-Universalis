@@ -23,6 +23,14 @@ struct bufferData
     float              time;
 };
 
+struct callBackData
+{
+    point       *axisTicks;
+    unsigned int axisTicksVBO;
+    int          numberOfTicksOnAxis;
+    int          numberOfTicks;
+};
+
 std::vector<float> createString( const int numberOfPoints, const float length, const float height ); // plucked string
 
 std::vector<float> createString( const int numberOfPoints, const float length, const float height, const float width, const float startingLocation, const std::string sign = "positive" ); // pulse string
@@ -34,6 +42,8 @@ void updateFixedString( std::vector<float> &stringVector, std::vector<float> &ve
 void updateFreeString( std::vector<float> &stringVector, std::vector<float> &velocity, const std::vector<float> &mass, const int stringPoints, const float tension, const float deltaLength, const float deltaTime );
 
 void updateFreeDispersiveString( std::vector<float> &stringVector, std::vector<float> &velocity, const std::vector<float> &mass, const int stringPoints, const float tension, const float deltaLength, const float deltaTime, const float dampingCoefficient );
+
+void makeAxisTicks( point *axisTicks, int numberOfTicks, float tickSize, GLFWwindow *window );
 
 void pushToBuffer( std::queue<bufferData> &buffer, const std::vector<float> &stringVector, const float time );
 
@@ -49,9 +59,11 @@ void initialiseVboVao( unsigned int &VBO, unsigned int &VAO, point *graph, unsig
 
 void initialiseAxesVboVao( unsigned int &axesVBO, unsigned int &axesVAO, point *axes, unsigned int &shaderProgram );
 
+void initialiseAxisTicksVboVao( unsigned int &axisTicksVBO, unsigned int &axisTicksVAO, point *axisTicks, unsigned int &shaderProgram, const int numberOfTicks );
+
 void processInput( GLFWwindow *window, float &updateSpeed, bool &saveData );
 
-void rendering( unsigned int &shaderProgram, unsigned int &VAO, unsigned int &axesVAO, const int numberOfPoints, int colourLocation );
+void rendering( unsigned int &shaderProgram, unsigned int &VAO, unsigned int &axesVAO, unsigned int &axisTicksVAO, const int numberOfPoints, int colourLocation, const int numberOfticks );
 
 void eventSwap( GLFWwindow *window );
 
@@ -89,6 +101,8 @@ int main() {
     glfwMakeContextCurrent( window );
     glfwSetFramebufferSizeCallback( window, framebuffer_size_callback ); // resizes the viewport if the size of the window is changed
 
+    callBackData callbackData;
+
     // initialises GLAD and set some parameters
     initialiseGLAD();
 
@@ -120,6 +134,11 @@ int main() {
     };
     // clang-format on
 
+    const int numberOfTicksOnAxis = 10; // number of ticks per half a full axis
+    const int numberOfTicks       = ( 2 * numberOfTicksOnAxis + 1 ) * 4;
+    point     axisTicks[numberOfTicks];
+    makeAxisTicks( axisTicks, numberOfTicksOnAxis, 0.01f, window );
+
     std::queue<bufferData> buffer;
 
     // initial shape of string
@@ -138,6 +157,18 @@ int main() {
     unsigned int axesVBO;
     unsigned int axesVAO;
     initialiseAxesVboVao( axesVBO, axesVAO, axes, shaderProgram );
+
+    // initialises axis ticks VBO and VAO
+    unsigned int axisTicksVBO;
+    unsigned int axisTicksVAO;
+    initialiseAxisTicksVboVao( axisTicksVBO, axisTicksVAO, axisTicks, shaderProgram, numberOfTicks );
+
+    // axis callback data
+    callbackData.axisTicks           = axisTicks;
+    callbackData.axisTicksVBO        = axisTicksVBO;
+    callbackData.numberOfTicksOnAxis = numberOfTicksOnAxis;
+    callbackData.numberOfTicks       = numberOfTicks;
+    glfwSetWindowUserPointer( window, &callbackData );
 
     // initialises VBO and VAO
     unsigned int VBO;
@@ -198,8 +229,9 @@ int main() {
         std::cout << realTime << "\t" << time << std::endl;
 
         // save data to the buffer
+        glBindBuffer( GL_ARRAY_BUFFER, VBO );
         glBufferData( GL_ARRAY_BUFFER, numberOfPoints * sizeof( point ), graph, GL_DYNAMIC_DRAW );
-        rendering( shaderProgram, VAO, axesVAO, numberOfPoints, colourLocation );
+        rendering( shaderProgram, VAO, axesVAO, axisTicksVAO, numberOfPoints, colourLocation, numberOfTicks );
 
         eventSwap( window );
     }
@@ -303,6 +335,24 @@ void updateFreeDispersiveString( std::vector<float> &stringVector, std::vector<f
     stringVector.at( stringPoints - 3 ) = temporaryString.at( stringPoints - 3 );
     stringVector.at( 0 )                = temporaryString.at( 0 );                // first point
     stringVector.at( stringPoints - 1 ) = temporaryString.at( stringPoints - 1 ); // last point
+}
+
+void makeAxisTicks( point *axisTicks, int numberOfTicks, float tickSize, GLFWwindow *window ) {
+    int width;
+    int height;
+    glfwGetFramebufferSize( window, &width, &height );
+    float aspectRatio = static_cast<float>( width ) / static_cast<float>( height );
+    int   i           = 0;
+    for( int j = -numberOfTicks; j <= numberOfTicks; ++j ) {
+        float tick = static_cast<float>( j ) / numberOfTicks;
+
+        // x axis
+        axisTicks[i++] = { tick, tickSize * aspectRatio };
+        axisTicks[i++] = { tick, -tickSize * aspectRatio };
+        // y axis
+        axisTicks[i++] = { -tickSize, tick };
+        axisTicks[i++] = { tickSize, tick };
+    }
 }
 
 void pushToBuffer( std::queue<bufferData> &buffer, const std::vector<float> &stringVector, const float time ) {
@@ -421,6 +471,19 @@ void initialiseAxesVboVao( unsigned int &axesVBO, unsigned int &axesVAO, point *
     glEnableVertexAttribArray( 0 );
 }
 
+void initialiseAxisTicksVboVao( unsigned int &axisTicksVBO, unsigned int &axisTicksVAO, point *axisTicks, unsigned int &shaderProgram, const int numberOfTicks ) {
+    // vbo
+    glGenBuffers( 1, &axisTicksVBO );
+    glGenVertexArrays( 1, &axisTicksVAO );
+    glBindVertexArray( axisTicksVAO );
+    // copy verticies array into a buffer
+    glBindBuffer( GL_ARRAY_BUFFER, axisTicksVBO );
+    glBufferData( GL_ARRAY_BUFFER, numberOfTicks * sizeof( point ), axisTicks, GL_STATIC_DRAW );
+    // set vertex attributes pointers
+    glVertexAttribPointer( 0, 2, GL_FLOAT, GL_FALSE, 0, (void *)0 );
+    glEnableVertexAttribArray( 0 );
+}
+
 void processInput( GLFWwindow *window, float &updateSpeed, bool &saveData ) {
     if( glfwGetKey( window, GLFW_KEY_ESCAPE ) == GLFW_PRESS ) {
         glfwSetWindowShouldClose( window, true );
@@ -445,16 +508,18 @@ void processInput( GLFWwindow *window, float &updateSpeed, bool &saveData ) {
     }
 }
 
-void rendering( unsigned int &shaderProgram, unsigned int &VAO, unsigned int &axesVAO, const int numberOfPoints, int colourLocation ) {
+void rendering( unsigned int &shaderProgram, unsigned int &VAO, unsigned int &axesVAO, unsigned int &axisTicksVAO, const int numberOfPoints, int colourLocation, const int numberOfticks ) {
     glClear( GL_COLOR_BUFFER_BIT );
     glUseProgram( shaderProgram );
     // axes
-    glUniform3f(colourLocation, 0.75f, 0.75f, 0.75f );
+    glUniform3f( colourLocation, 0.75f, 0.75f, 0.75f );
     glLineWidth( 1.0f );
     glBindVertexArray( axesVAO );
     glDrawArrays( GL_LINES, 0, 4 );
+    glBindVertexArray( axisTicksVAO );
+    glDrawArrays( GL_LINES, 0, numberOfticks );
     // string
-    glUniform3f(colourLocation, 0.0f, 0.0f, 0.0f );
+    glUniform3f( colourLocation, 0.0f, 0.0f, 0.0f );
     glLineWidth( 1.3f );
     glBindVertexArray( VAO );
     glDrawArrays( GL_LINE_STRIP, 0, numberOfPoints );
@@ -467,4 +532,8 @@ void eventSwap( GLFWwindow *window ) {
 
 void framebuffer_size_callback( GLFWwindow *window, int width, int height ) {
     glViewport( 0, 0, width, height );
+    callBackData *data = static_cast<callBackData *>( glfwGetWindowUserPointer( window ) );
+    makeAxisTicks( data->axisTicks, data->numberOfTicksOnAxis, 0.01f, window );
+    glBindBuffer( GL_ARRAY_BUFFER, data->axisTicksVBO );
+    glBufferData( GL_ARRAY_BUFFER, data->numberOfTicks * sizeof( point ), data->axisTicks, GL_STATIC_DRAW );
 }
