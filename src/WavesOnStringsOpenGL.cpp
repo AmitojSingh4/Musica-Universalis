@@ -1,3 +1,6 @@
+// includes
+// --------
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
@@ -10,7 +13,9 @@
 #include <numbers>
 #include <queue>
 
-// function prototypes
+// structs
+// -------
+
 struct point
 {
     GLfloat x;
@@ -31,6 +36,9 @@ struct callBackData
     int          numberOfTicks;
 };
 
+// function prototypes
+// -------------------
+
 std::vector<float> createString( const int numberOfPoints, const float length, const float height ); // plucked string
 
 std::vector<float> createString( const int numberOfPoints, const float length, const float height, const float width, const float startingLocation, const std::string sign = "positive" ); // pulse string
@@ -48,6 +56,9 @@ void makeAxisTicks( point *axisTicks, int numberOfTicks, float tickSize, GLFWwin
 void pushToBuffer( std::queue<bufferData> &buffer, const std::vector<float> &stringVector, const float time );
 
 void writeToFile( std::queue<bufferData> buffer, std::ofstream &data, const float deltaLength );
+
+// opengl function prototypes
+// --------------------------
 
 void initialiseGLFW();
 
@@ -87,6 +98,8 @@ const char *fragmentShaderSource =
 // clang-format on
 
 // main
+// ----
+
 int main() {
     // initialises GLFW
     initialiseGLFW();
@@ -101,6 +114,7 @@ int main() {
     glfwMakeContextCurrent( window );
     glfwSetFramebufferSizeCallback( window, framebuffer_size_callback ); // resizes the viewport if the size of the window is changed
 
+    // callback data for axis ticks
     callBackData callbackData;
 
     // initialises GLAD and set some parameters
@@ -122,8 +136,10 @@ int main() {
     const int   numberOfPoints = 101; // number of points in the string, can only be odd
     const float height         = 1.0; // amplitude of peaks in the y direction (meters)
 
+    // holds the string data
     point graph[numberOfPoints];
 
+    // holds the axes
     // clang-format off
     point axes[4] = {
         // x axis 
@@ -135,11 +151,13 @@ int main() {
     };
     // clang-format on
 
+    // axis ticks
     const int numberOfTicksOnAxis = 10; // number of ticks per half a full axis
     const int numberOfTicks       = ( 2 * numberOfTicksOnAxis + 1 ) * 4;
     point     axisTicks[numberOfTicks];
     makeAxisTicks( axisTicks, numberOfTicksOnAxis, 0.01f, window );
 
+    // holds the buffered data
     std::queue<bufferData> buffer;
 
     // initial shape of string
@@ -191,22 +209,25 @@ int main() {
     // velocity vector
     std::vector<float> velocity( stringPoints, 0.0 );
 
+    // enables vsync
     glfwSwapInterval( 1 );
 
     while( !glfwWindowShouldClose( window ) ) {
+        // frame time calculation
         float        currentTime  = glfwGetTime();
         static float previousTime = currentTime;
         float        frameTime    = currentTime - previousTime;
         previousTime              = currentTime;
-        // std::cout << frameTime << std::endl;
 
         processInput( window, updateSpeed, saveData );
 
+        // auto save
         if( autoSaveTime != 0.0 && time + 1e-4 > autoSaveTime ) {
             saveData     = true;
             autoSaveTime = 0.0;
         }
 
+        // saving and buffering data
         if( saveData ) {
             saveData = false;
             writeToFile( buffer, data, deltaLength );
@@ -218,6 +239,7 @@ int main() {
             intTime += 1;
         }
 
+        // updates string
         if( realTime + 1e-4 >= time ) {
             // updateFixedString( stringVector, velocity, mass, stringPoints, tension, deltaLength, deltaTime );
             // updateFreeString( stringVector, velocity, mass, stringPoints, tension, deltaLength, deltaTime );
@@ -231,6 +253,7 @@ int main() {
             time += deltaTime;
         }
 
+        // precise time
         realTime += frameTime * updateSpeed;
         //std::cout << realTime << "\t" << time << std::endl;
 
@@ -248,7 +271,10 @@ int main() {
 }
 
 // functions
+// ---------
+
 std::vector<float> createString( const int numberOfPoints, const float length, const float height ) {
+    // plucked
     std::vector<float> stringVector( numberOfPoints, 0.0 );
     const float        gradiant = height / ( length / 2.0 ); // gradient per point on the string
     for( int i = 0; i <= ( ( numberOfPoints - 1 ) / 2 ); i++ ) {
@@ -259,6 +285,7 @@ std::vector<float> createString( const int numberOfPoints, const float length, c
 }
 
 std::vector<float> createString( const int numberOfPoints, const float length, const float height, const float width, const float startingLocation, const std::string sign ) {
+    // pulse 
     std::vector<float> stringVector( numberOfPoints, 0.0 );
     float              signValue = 1.0;
     if( sign != "positive" ) {
@@ -273,6 +300,7 @@ std::vector<float> createString( const int numberOfPoints, const float length, c
 }
 
 std::vector<float> createString( const int numberOfPoints, const int mode, const float height ) {
+    // standing waves
     std::vector<float> stringVector( numberOfPoints, 0.0 );
     for( int i = 0; i < stringVector.size(); i++ ) {
         float heightValue    = height * sin( i * ( mode / 2.0 ) * 2.0 * std::numbers::pi / ( numberOfPoints - 1 ) );
@@ -343,10 +371,15 @@ void updateFreeDispersiveString( std::vector<float> &stringVector, std::vector<f
     stringVector.at( stringPoints - 1 ) = temporaryString.at( stringPoints - 1 ); // last point
 }
 
+// opengl functions
+// ----------------
+
 void makeAxisTicks( point *axisTicks, int numberOfTicks, float tickSize, GLFWwindow *window ) {
+    // window width and height
     int width;
     int height;
     glfwGetFramebufferSize( window, &width, &height );
+    // aspect ratio for equivilent sized ticks
     float aspectRatio = static_cast<float>( width ) / static_cast<float>( height );
     int   i           = 0;
     for( int j = -numberOfTicks; j <= numberOfTicks; ++j ) {
@@ -362,6 +395,7 @@ void makeAxisTicks( point *axisTicks, int numberOfTicks, float tickSize, GLFWwin
 }
 
 void pushToBuffer( std::queue<bufferData> &buffer, const std::vector<float> &stringVector, const float time ) {
+    // buffers the past 10 values passed into it
     bufferData data;
     data.string = stringVector;
     data.time   = time;
@@ -372,6 +406,7 @@ void pushToBuffer( std::queue<bufferData> &buffer, const std::vector<float> &str
 }
 
 void writeToFile( std::queue<bufferData> buffer, std::ofstream &data, const float deltaLength ) {
+    // saves the buffered data to the file
     const int initialBufferSize = buffer.size();
     for( int i = 0; i < initialBufferSize; i++ ) {
         std::vector<float> stringVector = buffer.front().string;
@@ -410,13 +445,14 @@ void initialiseGLAD() {
 }
 
 void initialiseShaders( unsigned int &vertexShader, unsigned int &fragmentShader, unsigned int &shaderProgram, int &colourLocation ) {
+    // error logging
+    int  success;
+    char infolog[512];
     // vertex shader
     vertexShader = glCreateShader( GL_VERTEX_SHADER );
     glShaderSource( vertexShader, 1, &vertexShaderSource, NULL );
     glCompileShader( vertexShader );
 
-    int  success;
-    char infolog[512];
     glGetShaderiv( vertexShader, GL_COMPILE_STATUS, &success );
     if( !success ) {
         glGetShaderInfoLog( vertexShader, 512, NULL, infolog );
@@ -492,8 +528,10 @@ void initialiseAxisTicksVboVao( unsigned int &axisTicksVBO, unsigned int &axisTi
 }
 
 void processInput( GLFWwindow *window, float &updateSpeed, bool &saveData ) {
+    // saving data variables
     static bool saveKeyWasPressed = false;
     bool saveKeyIsPressed = glfwGetKey( window, GLFW_KEY_0 ) == GLFW_PRESS;
+    // key presses
     if( glfwGetKey( window, GLFW_KEY_ESCAPE ) == GLFW_PRESS ) {
         glfwSetWindowShouldClose( window, true );
     }
@@ -542,6 +580,7 @@ void eventSwap( GLFWwindow *window ) {
 
 void framebuffer_size_callback( GLFWwindow *window, int width, int height ) {
     glViewport( 0, 0, width, height );
+    // resize axis ticks
     callBackData *data = static_cast<callBackData *>( glfwGetWindowUserPointer( window ) );
     makeAxisTicks( data->axisTicks, data->numberOfTicksOnAxis, 0.01f, window );
     glBindBuffer( GL_ARRAY_BUFFER, data->axisTicksVBO );
