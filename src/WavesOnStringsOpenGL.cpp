@@ -47,7 +47,7 @@ void makeAxisTicks( point *axisTicks, int numberOfTicks, float tickSize, GLFWwin
 
 void pushToBuffer( std::queue<bufferData> &buffer, const std::vector<float> &stringVector, const float time );
 
-void writeToFile( std::queue<bufferData> &buffer, std::ofstream &data, const float deltaLength );
+void writeToFile( std::queue<bufferData> buffer, std::ofstream &data, const float deltaLength );
 
 void initialiseGLFW();
 
@@ -107,8 +107,9 @@ int main() {
     initialiseGLAD();
 
     // file and data saving
-    bool          saveData = false;
-    std::string   fileName = "WavesOnStringsData.dat"; // name of file to save data to
+    bool          saveData     = false;
+    float         autoSaveTime = 0.0;                     // 0.0 = no auto save (secconds)
+    std::string   fileName     = "WavesOnStringsData.dat"; // name of file to save data to
     std::ofstream data( "../../data/" + fileName );
     if( !data ) {
         std::cerr << format( "Error: could not open file, {}\n\n", fileName );
@@ -201,14 +202,19 @@ int main() {
 
         processInput( window, updateSpeed, saveData );
 
+        if( autoSaveTime != 0.0 && time + 1e-4 > autoSaveTime ) {
+            saveData     = true;
+            autoSaveTime = 0.0;
+        }
+
         if( saveData ) {
-            writeToFile( buffer, data, deltaLength );
             saveData = false;
+            writeToFile( buffer, data, deltaLength );
         }
         else if( !saveData && time + 1e-4 >= intTime ) { // push to buffer every int seccond
             // buffer data
             pushToBuffer( buffer, stringVector, time );
-            // std::cout << time << std::endl;
+            std::cout << std::format("Time: {:.1f}", time) << std::endl;
             intTime += 1;
         }
 
@@ -226,7 +232,7 @@ int main() {
         }
 
         realTime += frameTime * updateSpeed;
-        std::cout << realTime << "\t" << time << std::endl;
+        //std::cout << realTime << "\t" << time << std::endl;
 
         // save data to the buffer
         glBindBuffer( GL_ARRAY_BUFFER, VBO );
@@ -365,8 +371,9 @@ void pushToBuffer( std::queue<bufferData> &buffer, const std::vector<float> &str
     }
 }
 
-void writeToFile( std::queue<bufferData> &buffer, std::ofstream &data, const float deltaLength ) {
-    for( int i = 0; i < buffer.size(); i++ ) {
+void writeToFile( std::queue<bufferData> buffer, std::ofstream &data, const float deltaLength ) {
+    const int initialBufferSize = buffer.size();
+    for( int i = 0; i < initialBufferSize; i++ ) {
         std::vector<float> stringVector = buffer.front().string;
         float              time         = buffer.front().time;
         for( int j = 0; j < stringVector.size(); j++ ) {
@@ -485,6 +492,8 @@ void initialiseAxisTicksVboVao( unsigned int &axisTicksVBO, unsigned int &axisTi
 }
 
 void processInput( GLFWwindow *window, float &updateSpeed, bool &saveData ) {
+    static bool saveKeyWasPressed = false;
+    bool saveKeyIsPressed = glfwGetKey( window, GLFW_KEY_0 ) == GLFW_PRESS;
     if( glfwGetKey( window, GLFW_KEY_ESCAPE ) == GLFW_PRESS ) {
         glfwSetWindowShouldClose( window, true );
     }
@@ -503,9 +512,10 @@ void processInput( GLFWwindow *window, float &updateSpeed, bool &saveData ) {
     if( glfwGetKey( window, GLFW_KEY_5 ) == GLFW_PRESS ) {
         updateSpeed = 0.1;
     }
-    if( glfwGetKey( window, GLFW_KEY_0 ) == GLFW_PRESS ) {
+    if( saveKeyIsPressed && !saveKeyWasPressed ) {
         saveData = true;
     }
+    saveKeyWasPressed = saveKeyIsPressed;
 }
 
 void rendering( unsigned int &shaderProgram, unsigned int &VAO, unsigned int &axesVAO, unsigned int &axisTicksVAO, const int numberOfPoints, int colourLocation, const int numberOfticks ) {
