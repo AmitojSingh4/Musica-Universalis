@@ -24,8 +24,8 @@ struct point
 
 struct bufferData
 {
-    std::vector<float> string;
-    float              time;
+    std::vector<double> string;
+    double              time;
 };
 
 struct callBackData
@@ -39,23 +39,23 @@ struct callBackData
 // function prototypes
 // -------------------
 
-std::vector<float> createString( const int numberOfPoints, const float length, const float height ); // plucked string
+std::vector<double> createString( const int numberOfPoints, const double length, const double height ); // plucked string
 
-std::vector<float> createString( const int numberOfPoints, const float length, const float height, const float width, const float startingLocation, const std::string sign = "positive" ); // pulse string
+std::vector<double> createString( const int numberOfPoints, const double length, const double height, const double width, const double startingLocation, const std::string sign = "positive" ); // pulse string
 
-std::vector<float> createString( const int numberOfPoints, const int mode, const float height ); // standing wave string
+std::vector<double> createString( const int numberOfPoints, const int mode, const double height ); // standing wave string
 
-void updateFixedString( std::vector<float> &stringVector, std::vector<float> &velocity, const std::vector<float> &mass, const int stringPoints, const float tension, const float deltaLength, const float deltaTime );
+void updateFixedString( std::vector<double> &stringVector, std::vector<double> &velocity, const std::vector<double> &mass, const int stringPoints, const double tension, const double deltaLength, const double deltaTime );
 
-void updateFreeString( std::vector<float> &stringVector, std::vector<float> &velocity, const std::vector<float> &mass, const int stringPoints, const float tension, const float deltaLength, const float deltaTime );
+void updateFreeString( std::vector<double> &stringVector, std::vector<double> &velocity, const std::vector<double> &mass, const int stringPoints, const double tension, const double deltaLength, const double deltaTime );
 
-void updateFreeDispersiveString( std::vector<float> &stringVector, std::vector<float> &velocity, const std::vector<float> &mass, const int stringPoints, const float tension, const float deltaLength, const float deltaTime, const float dampingCoefficient );
+void updateFreeDispersiveString( std::vector<double> &stringVector, std::vector<double> &velocity, const std::vector<double> &mass, const int stringPoints, const double tension, const double deltaLength, const double deltaTime, const double dampingCoefficient );
 
 void makeAxisTicks( point *axisTicks, int numberOfTicks, float tickSize, GLFWwindow *window );
 
-void pushToBuffer( std::queue<bufferData> &buffer, const std::vector<float> &stringVector, const float time );
+void pushToBuffer( std::queue<bufferData> &buffer, const std::vector<double> &stringVector, const double time );
 
-void writeToFile( std::queue<bufferData> buffer, std::ofstream &data, const float deltaLength );
+void writeToFile( std::queue<bufferData> buffer, std::ofstream &data, const double deltaLength );
 
 // opengl function prototypes
 // --------------------------
@@ -125,7 +125,7 @@ int main() {
 
     // file and data saving
     bool          saveData     = false;
-    float         autoSaveTime = 0.0;                     // 0.0 = no auto save (secconds)
+    double         autoSaveTime = 0.0;                     // 0.0 = no auto save (secconds)
     std::string   fileName     = "WavesOnStringsData.dat"; // name of file to save data to
     std::ofstream data( "../../data/" + fileName );
     if( !data ) {
@@ -135,9 +135,9 @@ int main() {
     data << "t\tx\ty\n";
 
     // system variables
-    const float length         = 100; // length of the string in the x direction (meters)
+    const double length         = 100; // length of the string in the x direction (meters)
     const int   numberOfPoints = 101; // number of points in the string, can only be odd
-    const float height         = 1.0; // amplitude of peaks in the y direction (meters)
+    const double height         = 1.0; // amplitude of peaks in the y direction (meters)
 
     // holds the string data
     point graph[numberOfPoints];
@@ -164,9 +164,9 @@ int main() {
     std::queue<bufferData> buffer;
 
     // initial shape of string
-    // std::vector<float> stringVector = createString( numberOfPoints, length, height ); // 1
-    std::vector<float> stringVector = createString( numberOfPoints, 3, height ); // 3
-    // std::vector<float> stringVector = createString( numberOfPoints, length, height, 5, 50 ); // 2
+    // std::vector<double> stringVector = createString( numberOfPoints, length, height ); // 1
+    std::vector<double> stringVector = createString( numberOfPoints, 3, height ); // 3
+    // std::vector<double> stringVector = createString( numberOfPoints, length, height, 5, 50 ); // 2
 
     // initialises shaders
     unsigned int vertexShader;
@@ -198,28 +198,28 @@ int main() {
     initialiseVboVao( VBO, VAO, graph, shaderProgram );
 
     // time variables
-    float time        = 0.0; // time (secconds)
-    float deltaTime   = 0.1; // delta time between steps (secconds)
+    double time        = 0.0; // time (secconds)
+    double deltaTime   = 0.1; // delta time between steps (secconds)
     int   intTime     = 0;   // integer time used for buffering data
-    float realTime    = 0.0; // the in world real time that has passed
+    double realTime    = 0.0; // the in world real time that has passed
     float updateSpeed = 1.0; // the speed at which the string is updated
     // string variables
     const int          stringPoints = stringVector.size();
-    const float        tension      = 10.0;                                  // tension along the string (newtons)
-    std::vector<float> mass( stringPoints, 1.0 );                            // mass of the string (kg) - mass is uniform accross the string
-    const float        deltaLength        = length / ( numberOfPoints - 1 ); // the distance between points (meters)
-    const float        dampingCoefficient = 1.0;                             // damping coefficient in the free dispersive string
+    const double        tension      = 10.0;                                  // tension along the string (newtons)
+    std::vector<double> mass( stringPoints, 1.0 );                            // mass of the string (kg) - mass is uniform accross the string
+    const double        deltaLength        = length / ( numberOfPoints - 1 ); // the distance between points (meters)
+    const double        dampingCoefficient = 1.0;                             // damping coefficient in the free dispersive string
     // velocity vector
-    std::vector<float> velocity( stringPoints, 0.0 );
+    std::vector<double> velocity( stringPoints, 0.0 );
 
     // enables vsync
     glfwSwapInterval( 1 );
 
     while( !glfwWindowShouldClose( window ) ) {
         // frame time calculation
-        float        currentTime  = glfwGetTime();
-        static float previousTime = currentTime;
-        float        frameTime    = currentTime - previousTime;
+        double        currentTime  = glfwGetTime();
+        static double previousTime = currentTime;
+        double        frameTime    = currentTime - previousTime;
         previousTime              = currentTime;
 
         processInput( window, updateSpeed, saveData );
@@ -251,13 +251,13 @@ int main() {
             for( int i = 0; i < numberOfPoints; i++ ) {
                 float x    = ( i ) / 50.0;
                 graph[i].x = x - 1;
-                graph[i].y = stringVector[i];
+                graph[i].y = static_cast<float>(stringVector[i]);
             }
             time += deltaTime;
         }
 
         // precise time
-        realTime += frameTime * updateSpeed;
+        realTime += frameTime * static_cast<double>(updateSpeed);
         //std::cout << realTime << "\t" << time << std::endl;
 
         // save data to the buffer
@@ -276,10 +276,10 @@ int main() {
 // functions
 // ---------
 
-std::vector<float> createString( const int numberOfPoints, const float length, const float height ) {
+std::vector<double> createString( const int numberOfPoints, const double length, const double height ) {
     // plucked
-    std::vector<float> stringVector( numberOfPoints, 0.0 );
-    const float        gradiant = height / ( length / 2.0 ); // gradient per point on the string
+    std::vector<double> stringVector( numberOfPoints, 0.0 );
+    const double        gradiant = height / ( length / 2.0 ); // gradient per point on the string
     for( int i = 0; i <= ( ( numberOfPoints - 1 ) / 2 ); i++ ) {
         stringVector.at( i )                      = i * gradiant; // fills left to midpoint
         stringVector.at( numberOfPoints - 1 - i ) = i * gradiant; // fills right to midpoint
@@ -287,34 +287,34 @@ std::vector<float> createString( const int numberOfPoints, const float length, c
     return stringVector;
 }
 
-std::vector<float> createString( const int numberOfPoints, const float length, const float height, const float width, const float startingLocation, const std::string sign ) {
+std::vector<double> createString( const int numberOfPoints, const double length, const double height, const double width, const double startingLocation, const std::string sign ) {
     // pulse 
-    std::vector<float> stringVector( numberOfPoints, 0.0 );
-    float              signValue = 1.0;
+    std::vector<double> stringVector( numberOfPoints, 0.0 );
+    double              signValue = 1.0;
     if( sign != "positive" ) {
         signValue = -1.0;
     }
     const int widthPoints           = int( ( width / length ) * ( numberOfPoints - 1.0 ) + 0.5 );          // the width in terms of points on the string
     const int startingLocationPoint = int( ( startingLocation / length ) * ( numberOfPoints - 1 ) + 0.5 ); // starting location in the vector
     for( int i = startingLocationPoint; i <= startingLocationPoint + widthPoints; i++ ) {
-        stringVector.at( i ) = height * signValue * sin( ( i - startingLocationPoint ) * 2.0 * std::numbers::pi_v<float> / widthPoints );
+        stringVector.at( i ) = height * signValue * sin( ( i - startingLocationPoint ) * 2.0 * std::numbers::pi / widthPoints );
     }
     return stringVector;
 }
 
-std::vector<float> createString( const int numberOfPoints, const int mode, const float height ) {
+std::vector<double> createString( const int numberOfPoints, const int mode, const double height ) {
     // standing waves
-    std::vector<float> stringVector( numberOfPoints, 0.0 );
+    std::vector<double> stringVector( numberOfPoints, 0.0 );
     for( int i = 0; i < stringVector.size(); i++ ) {
-        float heightValue    = height * sin( i * ( mode / 2.0 ) * 2.0 * std::numbers::pi / ( numberOfPoints - 1 ) );
+        double heightValue    = height * sin( i * ( mode / 2.0 ) * 2.0 * std::numbers::pi / ( numberOfPoints - 1 ) );
         stringVector.at( i ) = heightValue;
     }
     return stringVector;
 }
 
-void updateFixedString( std::vector<float> &stringVector, std::vector<float> &velocity, const std::vector<float> &mass, const int stringPoints, const float tension, const float deltaLength, const float deltaTime ) {
+void updateFixedString( std::vector<double> &stringVector, std::vector<double> &velocity, const std::vector<double> &mass, const int stringPoints, const double tension, const double deltaLength, const double deltaTime ) {
     // temporary vectors
-    std::vector<float> temporaryString( stringPoints, 0.0 );
+    std::vector<double> temporaryString( stringPoints, 0.0 );
     temporaryString.at( 0 )                = stringVector.at( 0 );                // failsafe lines, however are unused
     temporaryString.at( stringPoints - 1 ) = stringVector.at( stringPoints - 1 ); // also a failsafe line
     // update the string for non edge points
@@ -329,9 +329,9 @@ void updateFixedString( std::vector<float> &stringVector, std::vector<float> &ve
     stringVector.at( stringPoints - 3 ) = temporaryString.at( stringPoints - 3 );
 }
 
-void updateFreeString( std::vector<float> &stringVector, std::vector<float> &velocity, const std::vector<float> &mass, const int stringPoints, const float tension, const float deltaLength, const float deltaTime ) {
+void updateFreeString( std::vector<double> &stringVector, std::vector<double> &velocity, const std::vector<double> &mass, const int stringPoints, const double tension, const double deltaLength, const double deltaTime ) {
     // temporary vectors
-    std::vector<float> temporaryString( stringPoints, 0.0 );
+    std::vector<double> temporaryString( stringPoints, 0.0 );
     // first and last point
     velocity.at( 0 ) += ( ( tension / mass.at( 0 ) ) * ( ( stringVector.at( 1 ) - stringVector.at( 0 ) ) / pow( deltaLength, 2 ) ) ) * deltaTime;
     velocity.at( stringPoints - 1 ) += ( -( tension / mass.at( stringPoints - 1 ) ) * ( ( stringVector.at( stringPoints - 1 ) - stringVector.at( stringPoints - 2 ) ) / pow( deltaLength, 2 ) ) ) * deltaTime;
@@ -351,9 +351,9 @@ void updateFreeString( std::vector<float> &stringVector, std::vector<float> &vel
     stringVector.at( stringPoints - 1 ) = temporaryString.at( stringPoints - 1 ); // last point
 }
 
-void updateFreeDispersiveString( std::vector<float> &stringVector, std::vector<float> &velocity, const std::vector<float> &mass, const int stringPoints, const float tension, const float deltaLength, const float deltaTime, const float dampingCoefficient ) {
+void updateFreeDispersiveString( std::vector<double> &stringVector, std::vector<double> &velocity, const std::vector<double> &mass, const int stringPoints, const double tension, const double deltaLength, const double deltaTime, const double dampingCoefficient ) {
     // temporary vectors
-    std::vector<float> temporaryString( stringPoints, 0.0 );
+    std::vector<double> temporaryString( stringPoints, 0.0 );
     // first and last point
     velocity.at( 0 ) += ( ( tension / mass.at( 0 ) ) * ( ( stringVector.at( 1 ) - stringVector.at( 0 ) ) / pow( deltaLength, 2 ) ) - ( dampingCoefficient / mass.at( 0 ) ) * ( velocity.at( 0 ) ) ) * deltaTime;
     velocity.at( stringPoints - 1 ) +=
@@ -373,9 +373,6 @@ void updateFreeDispersiveString( std::vector<float> &stringVector, std::vector<f
     stringVector.at( 0 )                = temporaryString.at( 0 );                // first point
     stringVector.at( stringPoints - 1 ) = temporaryString.at( stringPoints - 1 ); // last point
 }
-
-// opengl functions
-// ----------------
 
 void makeAxisTicks( point *axisTicks, int numberOfTicks, float tickSize, GLFWwindow *window ) {
     // window width and height
@@ -397,7 +394,7 @@ void makeAxisTicks( point *axisTicks, int numberOfTicks, float tickSize, GLFWwin
     }
 }
 
-void pushToBuffer( std::queue<bufferData> &buffer, const std::vector<float> &stringVector, const float time ) {
+void pushToBuffer( std::queue<bufferData> &buffer, const std::vector<double> &stringVector, const double time ) {
     // buffers the past 10 values passed into it
     bufferData data;
     data.string = stringVector;
@@ -408,12 +405,12 @@ void pushToBuffer( std::queue<bufferData> &buffer, const std::vector<float> &str
     }
 }
 
-void writeToFile( std::queue<bufferData> buffer, std::ofstream &data, const float deltaLength ) {
+void writeToFile( std::queue<bufferData> buffer, std::ofstream &data, const double deltaLength ) {
     // saves the buffered data to the file
     const int initialBufferSize = buffer.size();
     for( int i = 0; i < initialBufferSize; i++ ) {
-        std::vector<float> stringVector = buffer.front().string;
-        float              time         = buffer.front().time;
+        std::vector<double> stringVector = buffer.front().string;
+        double              time         = buffer.front().time;
         for( int j = 0; j < stringVector.size(); j++ ) {
             data << std::format( "{:.1f}\t{}\t{}\n", time, j * deltaLength, stringVector.at( j ) );
         }
@@ -421,6 +418,9 @@ void writeToFile( std::queue<bufferData> buffer, std::ofstream &data, const floa
     }
     std::cout << "Data Saved!" << std::endl;
 }
+
+// opengl functions
+// ----------------
 
 void initialiseGLFW() {
     // initialises glfw
